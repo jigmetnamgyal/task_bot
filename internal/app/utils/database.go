@@ -3,11 +3,14 @@ package utils
 import (
 	"database/sql"
 	_ "github.com/lib/pq"
+	storagego "github.com/supabase-community/storage-go"
 	"log"
 	"os"
 )
 
 var DB *sql.DB
+
+var SupabaseClient *storagego.Client
 
 func ConnectToDb() {
 	var connectionStr string
@@ -31,6 +34,9 @@ func ConnectToDb() {
 	}
 
 	DB = db
+
+	sbClient := storagego.NewClient(os.Getenv("SUPABASE_URL"), os.Getenv("SUPABASE_SECRET"), nil)
+	SupabaseClient = sbClient
 }
 
 func AddUser(telegramID int64) error {

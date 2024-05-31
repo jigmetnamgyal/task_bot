@@ -21,5 +21,6 @@ CREATE TABLE user_tasks (
     user_id INT REFERENCES users(id),
     task_id INT REFERENCES tasks(id),
     completed BOOLEAN DEFAULT FALSE,
+    proof_file_url TEXT NOT NULL,
     PRIMARY KEY (user_id, task_id)
 );

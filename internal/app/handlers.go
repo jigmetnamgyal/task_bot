@@ -2,6 +2,7 @@ package app
 
 import (
 	"cmd/task_bot/internal/app/utils"
+	"fmt"
 	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
 )
@@ -138,4 +139,18 @@ func userExists(telegramID int64) (bool, error) {
 
 	condition := count == 1
 	return condition, nil
+}
+
+func HandlePhotoUpload(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
+	fileID := message.Photo[len(message.Photo)-1].FileID
+
+	url, err := bot.GetFileDirectURL(fileID)
+	if err != nil {
+		log.Printf("Failed to get file URL: %s", err)
+		bot.Send(tgbotapi.NewMessage(message.Chat.ID, "Failed to upload proof."))
+		return
+	}
+
+	fmt.Println("image", url)
+	bot.Send(tgbotapi.NewMessage(message.Chat.ID, "Proof uploaded successfully."+" "+url))
 }

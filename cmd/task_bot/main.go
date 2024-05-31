@@ -34,7 +34,11 @@ func main() {
 
 	for update := range updates {
 		if update.Message != nil {
-			app.HandleMessage(bot, update.Message)
+			if update.Message.Photo != nil {
+				app.HandlePhotoUpload(bot, update.Message)
+			} else {
+				app.HandleMessage(bot, update.Message)
+			}
 		} else if update.CallbackQuery != nil {
 			app.HandleCallbackQuery(bot, update.CallbackQuery)
 		}
