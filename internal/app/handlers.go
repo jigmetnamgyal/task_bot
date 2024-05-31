@@ -90,26 +90,34 @@ func handleRegularMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message, cStat
 }
 
 func handleStartCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
-	msg := tgbotapi.NewMessage(message.Chat.ID, "Welcome to the Memecoin Bot!")
-	msg.ReplyMarkup = mainMenuKeyboard()
+	msg := tgbotapi.NewMessage(message.Chat.ID, "![Memecoin Task](https://gummyonsol.com/images/529376304672a8a43191f520936dbd48.png)\n *I am memecoin task - 🤖* \n\n Welcome to my bot! Here you can: \n - Search for memecoins \n - Complete tasks and earn points \n\n 💰 Let's earn points")
+	msg.ParseMode = "Markdown"
+	memeCoinBtn := tgbotapi.NewInlineKeyboardButtonData("Memecoin", "memecoin")
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(memeCoinBtn),
+	)
+	msg.ReplyMarkup = keyboard
 	bot.Send(msg)
 }
 
-func mainMenuKeyboard() tgbotapi.ReplyKeyboardMarkup {
-	memecoinButton := tgbotapi.NewKeyboardButton("Memecoin")
-	helpButton := tgbotapi.NewKeyboardButton("Help")
-
-	keyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(memecoinButton, helpButton),
-	)
-
-	return keyboard
-}
+//func mainMenuKeyboard() tgbotapi.ReplyKeyboardMarkup {
+//	memecoinButton := tgbotapi.NewKeyboardButton("Memecoin")
+//	helpButton := tgbotapi.NewKeyboardButton("Help")
+//
+//	keyboard := tgbotapi.NewReplyKeyboard(
+//		tgbotapi.NewKeyboardButtonRow(memecoinButton, helpButton),
+//	)
+//
+//	return keyboard
+//}
 
 func HandleCallbackQuery(bot *tgbotapi.BotAPI, callback *tgbotapi.CallbackQuery, cState *ChatState) {
 	switch callback.Data {
 	case "gummy":
 		showGummyTasks(bot, callback.Message.Chat.ID)
+	case "memecoin":
+		showMemecoinOptions(bot, callback.Message.Chat.ID)
 	case "baked":
 		showBakedTasks(bot, callback.Message.Chat.ID)
 	case "submit_proof_gummy":
@@ -141,7 +149,14 @@ func handleIDResponse(bot *tgbotapi.BotAPI, message *tgbotapi.Message, chatState
 }
 
 func showMemecoinOptions(bot *tgbotapi.BotAPI, chatID int64) {
-	msg := tgbotapi.NewMessage(chatID, "Choose a Memecoin:")
+	//photo := tgbotapi.NewPhoto(chatID, tgbotapi.FileURL("https://mybwvaraeybzsepptucn.supabase.co/storage/v1/object/public/task_memecoin/DALL_E_May_31_Gummy_Bear_Memecoins.webp"))
+	//_, err := bot.Send(photo)
+	//if err != nil {
+	//	log.Panic(err)
+	//}
+
+	msg := tgbotapi.NewMessage(chatID, "![choose memecoin](https://mybwvaraeybzsepptucn.supabase.co/storage/v1/object/public/task_memecoin/DALL_E_May_31_Gummy_Bear_Memecoins.webp) Choose a *Memecoin*: ")
+	msg.ParseMode = "Markdown"
 	msg.ReplyMarkup = memecoinKeyboard()
 	bot.Send(msg)
 }
@@ -164,14 +179,14 @@ func showUserProfile(bot *tgbotapi.BotAPI, chatID int64) {
 		response = "No points earned yet."
 	}
 
-	msg := tgbotapi.NewMessage(chatID, "*Total points earned: "+strconv.Itoa(total)+"*\n\n"+response)
+	msg := tgbotapi.NewMessage(chatID, "![Points](https://pbs.twimg.com/media/GN28dBfX0AA2dt-?format=jpg&name=large) \n*Total points earned: "+strconv.Itoa(total)+"*\n\n"+response)
 	msg.ParseMode = "Markdown"
 	bot.Send(msg)
 }
 
 func memecoinKeyboard() tgbotapi.InlineKeyboardMarkup {
-	gummyButton := tgbotapi.NewInlineKeyboardButtonData("Gummy", "gummy")
-	bakedButton := tgbotapi.NewInlineKeyboardButtonData("Baked", "baked")
+	gummyButton := tgbotapi.NewInlineKeyboardButtonData("$Gummy", "gummy")
+	bakedButton := tgbotapi.NewInlineKeyboardButtonData("$Baked", "baked")
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(gummyButton, bakedButton),
@@ -181,7 +196,8 @@ func memecoinKeyboard() tgbotapi.InlineKeyboardMarkup {
 }
 
 func showGummyTasks(bot *tgbotapi.BotAPI, chatID int64) {
-	msg := tgbotapi.NewMessage(chatID, "Choose gummy tasks to earn points:")
+	msg := tgbotapi.NewMessage(chatID, "Choose gummy tasks to [earn points](https://gummyonsol.com/images/f0d9f977ea430a9b57a7d4f7277df4eb.png):")
+	msg.ParseMode = "Markdown"
 	msg.ReplyMarkup = gummyTaskKeyboard()
 	bot.Send(msg)
 }
@@ -199,7 +215,7 @@ func gummyTaskKeyboard() tgbotapi.InlineKeyboardMarkup {
 }
 
 func showBakedTasks(bot *tgbotapi.BotAPI, chatID int64) {
-	msg := tgbotapi.NewMessage(chatID, "Choose Baked tasks to earn points")
+	msg := tgbotapi.NewMessage(chatID, "Choose Baked tasks to ![earn points](https://memestaking.com/_nuxt/baked-d.VVFJ9SFz.png):")
 	msg.ReplyMarkup = bakedTaskKeyboard()
 	bot.Send(msg)
 }
