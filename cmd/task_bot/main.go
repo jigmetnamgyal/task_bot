@@ -13,9 +13,7 @@ func init() {
 	utils.ConnectToDb()
 }
 
-type BotState int
-
-var chatState = make(map[int64]BotState)
+var chatState = &app.ChatState{M: make(map[int64]string)}
 
 func main() {
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_APITOKEN"))
@@ -34,13 +32,9 @@ func main() {
 
 	for update := range updates {
 		if update.Message != nil {
-			if update.Message.Photo != nil {
-				//app.HandlePhotoUpload(bot, update.Message)
-			} else {
-				app.HandleMessage(bot, update.Message)
-			}
+			app.HandleMessage(bot, update.Message, chatState)
 		} else if update.CallbackQuery != nil {
-			app.HandleCallbackQuery(bot, update.CallbackQuery)
+			app.HandleCallbackQuery(bot, update.CallbackQuery, chatState)
 		}
 	}
 }
