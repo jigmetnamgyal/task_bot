@@ -35,7 +35,7 @@ func main() {
 	for update := range updates {
 		if update.Message != nil {
 			if update.Message.Photo != nil {
-				app.HandlePhotoUpload(bot, update.Message)
+				//app.HandlePhotoUpload(bot, update.Message)
 			} else {
 				app.HandleMessage(bot, update.Message)
 			}

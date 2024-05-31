@@ -3,14 +3,11 @@ package utils
 import (
 	"database/sql"
 	_ "github.com/lib/pq"
-	storagego "github.com/supabase-community/storage-go"
 	"log"
 	"os"
 )
 
 var DB *sql.DB
-
-var SupabaseClient *storagego.Client
 
 func ConnectToDb() {
 	var connectionStr string
@@ -34,9 +31,6 @@ func ConnectToDb() {
 	}
 
 	DB = db
-
-	sbClient := storagego.NewClient(os.Getenv("SUPABASE_URL"), os.Getenv("SUPABASE_SECRET"), nil)
-	SupabaseClient = sbClient
 }
 
 func AddUser(telegramID int64) error {
@@ -44,14 +38,14 @@ func AddUser(telegramID int64) error {
 	return err
 }
 
-func CompleteTask(telegramID int64, tID string) error {
+func CompleteTask(telegramID int64, tID string, url string) error {
 	var userID int
 	err := DB.QueryRow("SELECT id FROM users WHERE telegram_id = $1", telegramID).Scan(&userID)
 	if err != nil {
 		return err
 	}
 
-	_, err = DB.Exec("INSERT INTO user_tasks (user_id, task_id, completed) VALUES ($1, $2, TRUE) ON CONFLICT (user_id, task_id) DO NOTHING", userID, tID)
+	_, err = DB.Exec("INSERT INTO user_tasks (user_id, task_id, completed, proof_file_url) VALUES ($1, $2, TRUE, $3) ON CONFLICT (user_id, task_id) DO NOTHING", userID, tID, url)
 	return err
 }
 

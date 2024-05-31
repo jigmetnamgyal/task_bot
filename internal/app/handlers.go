@@ -7,6 +7,16 @@ import (
 	"log"
 )
 
+var taskInfo = map[int]struct {
+	Description string
+	URL         string
+}{
+	1: {"Follow Gummy on Twitter", "https://twitter.com/gummy"},
+	2: {"Comment on YouTube for Gummy", "https://youtube.com/gummy"},
+	3: {"Follow Baked on Twitter", "https://twitter.com/baked"},
+	4: {"Comment on YouTube for Baked", "https://youtube.com/baked"},
+}
+
 func HandleMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
 	switch message.Command() {
 	case "start":
@@ -57,17 +67,14 @@ func HandleCallbackQuery(bot *tgbotapi.BotAPI, callback *tgbotapi.CallbackQuery)
 		showGummyTasks(bot, callback.Message.Chat.ID)
 	case "baked":
 		showBakedTasks(bot, callback.Message.Chat.ID)
+	case "submit_proof":
+		handlePhotoUpload(bot, callback.Message)
 	default:
 		log.Printf("Unknown callback: %s", callback.Data)
 	}
 }
 
-//func showMemecoinOptions(bot *tgbotapi.BotAPI, callback *tgbotapi.CallbackQuery) {
-//	msg := tgbotapi.NewMessage(callback.Message.Chat.ID, "Choose a Memecoin:")
-//	msg.ReplyMarkup = memecoinKeyboard()
-//	bot.Send(msg)
-//}
-
+// "INSERT INTO user_tasks (user_id, task_id, completed) VALUES ($1, $2, TRUE) ON CONFLICT (user_id, task_id) DO NOTHING"
 func showMemecoinOptions(bot *tgbotapi.BotAPI, chatID int64) {
 	msg := tgbotapi.NewMessage(chatID, "Choose a Memecoin:")
 	msg.ReplyMarkup = memecoinKeyboard()
@@ -85,11 +92,6 @@ func memecoinKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return keyboard
 }
 
-//func showGummyTasks(bot *tgbotapi.BotAPI, callback *tgbotapi.CallbackQuery) {
-//	//msg := tgbotapi.NewMessage(callback.Message.Chat.ID, "Tasks for Gummy:\n1. Follow Gummy Twitter account.\n2. Comment on YouTube.")
-//	//bot.Send(msg)
-//}
-
 func showGummyTasks(bot *tgbotapi.BotAPI, chatID int64) {
 	msg := tgbotapi.NewMessage(chatID, "Choose gummy tasks to earn points:")
 	msg.ReplyMarkup = gummyTaskKeyboard()
@@ -97,11 +99,12 @@ func showGummyTasks(bot *tgbotapi.BotAPI, chatID int64) {
 }
 
 func gummyTaskKeyboard() tgbotapi.InlineKeyboardMarkup {
-	twitterButton := tgbotapi.NewInlineKeyboardButtonURL("Follow $Gummy on Twitter", "https://twitter.com/baked")
-	youtubeButton := tgbotapi.NewInlineKeyboardButtonURL("Comment On Youtube", "https://youtube.com/baked")
+	twitterButton := tgbotapi.NewInlineKeyboardButtonURL("1. Follow $Gummy on Twitter", "https://twitter.com/baked")
+	youtubeButton := tgbotapi.NewInlineKeyboardButtonURL("2. Comment On Youtube", "https://youtube.com/baked")
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(twitterButton, youtubeButton),
+		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Submit Proof of Completion", "submit_proof")),
 	)
 
 	return keyboard
@@ -114,11 +117,12 @@ func showBakedTasks(bot *tgbotapi.BotAPI, chatID int64) {
 }
 
 func bakedTaskKeyboard() tgbotapi.InlineKeyboardMarkup {
-	twitterButton := tgbotapi.NewInlineKeyboardButtonURL("Follow $Baked Twitter", "https://twitter.com/baked")
-	youtubeButton := tgbotapi.NewInlineKeyboardButtonURL("Comment On Youtube", "https://youtube.com/baked")
+	twitterButton := tgbotapi.NewInlineKeyboardButtonURL("3. Follow $Baked Twitter", "https://twitter.com/baked")
+	youtubeButton := tgbotapi.NewInlineKeyboardButtonURL("4. Comment On Youtube", "https://youtube.com/baked")
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(twitterButton, youtubeButton),
+		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Submit Proof of Completion", "submit_proof")),
 	)
 
 	return keyboard
@@ -141,16 +145,34 @@ func userExists(telegramID int64) (bool, error) {
 	return condition, nil
 }
 
-func HandlePhotoUpload(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
-	fileID := message.Photo[len(message.Photo)-1].FileID
+func handlePhotoUpload(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
+	if message.Photo == nil {
+		msg := tgbotapi.NewMessage(message.Chat.ID, "please submit a file")
+		bot.Send(msg)
+		showMemecoinOptions(bot, message.Chat.ID)
+	} else {
+		fileID := message.Photo[len(message.Photo)-1].FileID
 
-	url, err := bot.GetFileDirectURL(fileID)
-	if err != nil {
-		log.Printf("Failed to get file URL: %s", err)
-		bot.Send(tgbotapi.NewMessage(message.Chat.ID, "Failed to upload proof."))
-		return
+		url, err := bot.GetFileDirectURL(fileID)
+		if err != nil {
+			log.Printf("Failed to get file URL: %s", err)
+			bot.Send(tgbotapi.NewMessage(message.Chat.ID, "Failed to upload proof."))
+			return
+		}
+
+		tID := message.Text
+
+		fmt.Println("task id ya", tID)
+
+		err = utils.CompleteTask(message.From.ID, "", url)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		msg := tgbotapi.NewMessage(message.Chat.ID, "*Proof uploaded successfully.*\nIn case of cheating we will penalize you")
+		_, err = bot.Send(msg)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
-
-	fmt.Println("image", url)
-	bot.Send(tgbotapi.NewMessage(message.Chat.ID, "Proof uploaded successfully."+" "+url))
 }
