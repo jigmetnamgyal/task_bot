@@ -95,7 +95,6 @@ func GetUnCompletedTasks(telegramID int64, offset int64) (*Task, error) {
 	var userID int
 	err := DB.QueryRow("SELECT id FROM users WHERE telegram_id = $1", telegramID).Scan(&userID)
 	if err != nil {
-		fmt.Println("here")
 		return nil, err
 	}
 
@@ -116,16 +115,13 @@ func GetUnCompletedTasks(telegramID int64, offset int64) (*Task, error) {
 
 	prepare, err := DB.Prepare(queryString)
 	if err != nil {
-		fmt.Println("here error: ", err.Error())
-		log.Println("Error prepare logs", err.Error())
+		return nil, err
 	}
 
 	err = prepare.QueryRow(userID, offset).Scan(&task.ID, &task.Name, &task.Links, &task.Descriptions, &task.TotalTasks)
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println(task)
 
 	return &task, nil
 }
@@ -144,17 +140,91 @@ func GetTotalNumberOfTasks(telegramID int64) (*int64, error) {
          SELECT t.id
          FROM tasks t
                   JOIN sub_tasks st ON t.id = st.task_id
-                  LEFT JOIN user_sub_tasks ust ON st.id = ust.sub_task_id AND ust.user_id = 1
+                  LEFT JOIN user_sub_tasks ust ON st.id = ust.sub_task_id AND ust.user_id = ($1)
          WHERE ust.completed = FALSE OR ust.user_id IS NULL
          GROUP BY t.id
      ) AS incomplete_tasks;
 	`
 
 	var totalTask int64
-	err = DB.QueryRow(queryString).Scan(&totalTask)
+	err = DB.QueryRow(queryString, userID).Scan(&totalTask)
 	if err != nil {
 		return nil, err
 	}
 
 	return &totalTask, nil
+}
+
+type SubTask struct {
+	ID            int     `json:"id"`
+	Name          string  `json:"name"`
+	Links         *string `json:"links"`
+	Descriptions  string  `json:"descriptions"`
+	TotalSubTasks int     `json:"total_sub_tasks"`
+	Points        int64   `json:"points"`
+	TaskID        int     `json:"task_id"`
+}
+
+func GetUnCompletedSubTasks(telegramID int64, tID int, offset int64) (*SubTask, error) {
+	var subTask SubTask
+	var userID int
+	err := DB.QueryRow("SELECT id FROM users WHERE telegram_id = $1", telegramID).Scan(&userID)
+	if err != nil {
+		fmt.Println("here")
+		return nil, err
+	}
+
+	queryString := `
+		WITH user_incomplete_sub_tasks AS (
+			SELECT st.id AS id, st.name, st.links, st.description, st.points, st.task_id, COUNT(st.id) as total_sub_tasks
+			FROM sub_tasks st
+				LEFT JOIN user_sub_tasks ust ON st.id = ust.sub_task_id AND ust.user_id = $1
+			WHERE st.task_id = ($2) AND (ust.completed = FALSE OR ust.user_id IS NULL)
+			GROUP BY st.id, st.name, st.links, st.description, st.points, st.task_id
+		)
+		SELECT *
+		FROM user_incomplete_sub_tasks
+		ORDER BY id
+		LIMIT 1 OFFSET $3;
+	`
+
+	prepare, err := DB.Prepare(queryString)
+	if err != nil {
+		return nil, err
+	}
+
+	err = prepare.QueryRow(userID, tID, offset).Scan(&subTask.ID, &subTask.Name, &subTask.Links, &subTask.Descriptions, &subTask.Points, &subTask.TaskID, &subTask.TotalSubTasks)
+	if err != nil {
+		return nil, err
+	}
+
+	return &subTask, nil
+}
+
+func GetTotalNumberOfSubTasks(telegramID int64, tID int) (*int64, error) {
+	var userID int
+	err := DB.QueryRow("SELECT id FROM users WHERE telegram_id = $1", telegramID).Scan(&userID)
+	if err != nil {
+		fmt.Println("here")
+		return nil, err
+	}
+
+	queryString := `
+	 SELECT COUNT(*)
+		FROM (
+         SELECT st.id
+         FROM sub_tasks st
+                  LEFT JOIN user_sub_tasks ust ON st.id = ust.sub_task_id AND ust.user_id = ($1)
+         WHERE ust.completed = FALSE OR ust.user_id IS NULL AND st.task_id = $2
+         GROUP BY st.id
+     ) AS incomplete_tasks;
+	`
+
+	var totalSubTask int64
+	err = DB.QueryRow(queryString, userID, tID).Scan(&totalSubTask)
+	if err != nil {
+		return nil, err
+	}
+
+	return &totalSubTask, nil
 }

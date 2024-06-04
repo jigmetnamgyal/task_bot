@@ -13,6 +13,8 @@ var taskID string
 
 var userOffsets = make(map[int64]int64)
 var mID = make(map[int64]int)
+var tID = make(map[int64]int)
+var stOffsets = make(map[int64]int64)
 
 type ChatState struct {
 	sync.RWMutex
@@ -50,8 +52,6 @@ func HandleMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message, cState *Chat
 				}
 
 				handleStartCommand(bot, message)
-			//case "memecoin":
-			//	showMemecoinOptions(bot, message.Chat.ID)
 			case "profile":
 				showUserProfile(bot, message.Chat.ID)
 			case "help":
@@ -117,25 +117,23 @@ func handleStartCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
 //}
 
 func HandleCallbackQuery(bot *tgbotapi.BotAPI, callback *tgbotapi.CallbackQuery, cState *ChatState) {
-	//handleIDResponse(bot, message, cState)
+	tid := tID[callback.Message.Chat.ID]
 
 	switch callback.Data {
 	case "help":
 		showHow(bot, callback.Message.Chat.ID)
 	case "earn":
-		ShowTasks(bot, callback.Message.Chat.ID, &userOffsets, &mID)
+		ShowTasks(bot, callback.Message.Chat.ID, &userOffsets, &mID, &tID)
 	case "prev":
 		ShowPrevTask(bot, callback.Message.Chat.ID, &userOffsets, &mID)
 	case "next":
 		ShowNextTask(bot, callback.Message.Chat.ID, &userOffsets, &mID)
-	case "gummy":
-		showGummyTasks(bot, callback.Message.Chat.ID)
-	case "baked":
-		showBakedTasks(bot, callback.Message.Chat.ID)
-	case "submit_proof_gummy":
-		showInitialPrompt(bot, callback.Message, cState, "gummy")
-	case "submit_proof_baked":
-		showInitialPrompt(bot, callback.Message, cState, "baked")
+	case "sub_task_prev":
+		ShowSubTaskPrevTask(bot, callback.Message.Chat.ID, &stOffsets, &mID, &tID)
+	case "sub_task_next":
+		ShowSubTaskNextTask(bot, callback.Message.Chat.ID, &stOffsets, &mID, &tID)
+	case "complete_task_" + strconv.Itoa(tid):
+		HandleTakeTask(bot, callback.Message.Chat.ID, tid, &stOffsets, &mID)
 	case "profile":
 		showUserProfile(bot, callback.Message.Chat.ID)
 	default:
@@ -150,10 +148,7 @@ func handleIDResponse(bot *tgbotapi.BotAPI, message *tgbotapi.Message, chatState
 		return
 	}
 
-	fmt.Println("Received ID:", message.Text)
-
 	taskID = message.Text
-	// Set the state to await a photo
 	chatState.Lock()
 	chatState.M[message.From.ID] = "awaitingPhoto"
 	chatState.Unlock()
@@ -174,10 +169,6 @@ func handleIDResponse(bot *tgbotapi.BotAPI, message *tgbotapi.Message, chatState
 //	msg.ReplyMarkup = memecoinKeyboard()
 //	bot.Send(msg)
 //}
-
-func showEarnMessage(bot *tgbotapi.BotAPI, chatID int64) {
-
-}
 
 func showHow(bot *tgbotapi.BotAPI, chatID int64) {
 	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FileURL("https://gummyonsol.com/images/529376304672a8a43191f520936dbd48.png"))
@@ -332,18 +323,18 @@ func handlePhotoUpload(bot *tgbotapi.BotAPI, message *tgbotapi.Message, cState *
 	cState.Unlock()
 }
 
-func showInitialPrompt(bot *tgbotapi.BotAPI, message *tgbotapi.Message, chatState *ChatState, memecoin string) {
-	var msg tgbotapi.MessageConfig
-	if memecoin == "gummy" {
-		msg = tgbotapi.NewMessage(message.Chat.ID, "please send an id to submit your proof:\n1. Follow $Gummy on Twitter\n2. Comment On Youtube\n")
-	} else if memecoin == "baked" {
-		msg = tgbotapi.NewMessage(message.Chat.ID, "please send an id to submit your proof:\n3. Follow $Baked on Twitter\n4. Comment On Youtube\n")
-	}
-
-	bot.Send(msg)
-
-	chatState.Lock()
-	fmt.Println(message.Chat.ID)
-	chatState.M[message.Chat.ID] = "awaitingID"
-	chatState.Unlock()
-}
+//func showInitialPrompt(bot *tgbotapi.BotAPI, message *tgbotapi.Message, chatState *ChatState, memecoin string) {
+//	var msg tgbotapi.MessageConfig
+//	if memecoin == "gummy" {
+//		msg = tgbotapi.NewMessage(message.Chat.ID, "please send an id to submit your proof:\n1. Follow $Gummy on Twitter\n2. Comment On Youtube\n")
+//	} else if memecoin == "baked" {
+//		msg = tgbotapi.NewMessage(message.Chat.ID, "please send an id to submit your proof:\n3. Follow $Baked on Twitter\n4. Comment On Youtube\n")
+//	}
+//
+//	bot.Send(msg)
+//
+//	chatState.Lock()
+//	fmt.Println(message.Chat.ID)
+//	chatState.M[message.Chat.ID] = "awaitingID"
+//	chatState.Unlock()
+//}
