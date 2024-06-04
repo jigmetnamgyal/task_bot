@@ -144,7 +144,7 @@ func HandleTakeTask(bot *tgbotapi.BotAPI, chatID int64, tid int, offsetMap *map[
 		return
 	}
 
-	msgText := fmt.Sprintf("Task Name: %s \nTask Description: %s \nTask Point: %d", subTasks.Name, subTasks.Descriptions, subTasks.Points)
+	msgText := fmt.Sprintf("Task Name: %s \n\nTask Description: %s \n\nTask Point: *%d*", subTasks.Name, subTasks.Descriptions, subTasks.Points)
 
 	editMsg := tgbotapi.NewEditMessageText(chatID, mid, msgText)
 
