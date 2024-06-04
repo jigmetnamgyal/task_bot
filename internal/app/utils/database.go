@@ -2,6 +2,7 @@ package utils
 
 import (
 	"database/sql"
+	"fmt"
 	_ "github.com/lib/pq"
 	"log"
 	"os"
@@ -79,4 +80,81 @@ func GetUserPoints(telegramID int64) (map[string]int, error) {
 	}
 
 	return points, nil
+}
+
+type Task struct {
+	ID           int     `json:"id"`
+	Name         string  `json:"name"`
+	Links        *string `json:"links"`
+	Descriptions string  `json:"descriptions"`
+	TotalTasks   int     `json:"total_tasks"`
+}
+
+func GetUnCompletedTasks(telegramID int64, offset int64) (*Task, error) {
+	var task Task
+	var userID int
+	err := DB.QueryRow("SELECT id FROM users WHERE telegram_id = $1", telegramID).Scan(&userID)
+	if err != nil {
+		fmt.Println("here")
+		return nil, err
+	}
+
+	queryString := `
+		 WITH user_incomplete_tasks AS (
+			SELECT t.id AS id, t.name, t.links, t.descriptions, COUNT(t.id) as total_tasks
+			FROM tasks t
+					 JOIN sub_tasks st ON t.id = st.task_id
+					 LEFT JOIN user_sub_tasks ust ON st.id = ust.sub_task_id AND ust.user_id = $1
+			WHERE ust.completed = FALSE OR ust.user_id IS NULL
+			GROUP BY t.id, t.name, t.links, t.descriptions
+		)
+		SELECT *
+		FROM user_incomplete_tasks
+		ORDER BY id
+		LIMIT 1 OFFSET $2;
+	`
+
+	prepare, err := DB.Prepare(queryString)
+	if err != nil {
+		fmt.Println("here error: ", err.Error())
+		log.Println("Error prepare logs", err.Error())
+	}
+
+	err = prepare.QueryRow(userID, offset).Scan(&task.ID, &task.Name, &task.Links, &task.Descriptions, &task.TotalTasks)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(task)
+
+	return &task, nil
+}
+
+func GetTotalNumberOfTasks(telegramID int64) (*int64, error) {
+	var userID int
+	err := DB.QueryRow("SELECT id FROM users WHERE telegram_id = $1", telegramID).Scan(&userID)
+	if err != nil {
+		fmt.Println("here")
+		return nil, err
+	}
+
+	queryString := `
+	 SELECT COUNT(*)
+		FROM (
+         SELECT t.id
+         FROM tasks t
+                  JOIN sub_tasks st ON t.id = st.task_id
+                  LEFT JOIN user_sub_tasks ust ON st.id = ust.sub_task_id AND ust.user_id = 1
+         WHERE ust.completed = FALSE OR ust.user_id IS NULL
+         GROUP BY t.id
+     ) AS incomplete_tasks;
+	`
+
+	var totalTask int64
+	err = DB.QueryRow(queryString).Scan(&totalTask)
+	if err != nil {
+		return nil, err
+	}
+
+	return &totalTask, nil
 }

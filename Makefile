@@ -4,6 +4,9 @@ include .env
 server:
 	go run cmd/task_bot/main.go
 
+api-server:
+	go run cmd/task_bot/server.go
+
 migration:
 	migrate create -ext sql -dir db/migration -seq $(NAME)
 

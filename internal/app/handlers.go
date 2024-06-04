@@ -10,15 +10,9 @@ import (
 )
 
 var taskID string
-var taskInfo = map[int]struct {
-	Description string
-	URL         string
-}{
-	1: {"Follow Gummy on Twitter", "https://twitter.com/gummy"},
-	2: {"Comment on YouTube for Gummy", "https://youtube.com/gummy"},
-	3: {"Follow Baked on Twitter", "https://twitter.com/baked"},
-	4: {"Comment on YouTube for Baked", "https://youtube.com/baked"},
-}
+
+var userOffsets = make(map[int64]int64)
+var mID = make(map[int64]int)
 
 type ChatState struct {
 	sync.RWMutex
@@ -32,8 +26,6 @@ func HandleMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message, cState *Chat
 	state := cState.M[userID]
 	cState.RUnlock()
 
-	fmt.Println(cState.M)
-	fmt.Println(userID)
 	switch state {
 	case "awaitingID":
 		handleIDResponse(bot, message, cState)
@@ -58,10 +50,12 @@ func HandleMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message, cState *Chat
 				}
 
 				handleStartCommand(bot, message)
-			case "memecoin":
-				showMemecoinOptions(bot, message.Chat.ID)
+			//case "memecoin":
+			//	showMemecoinOptions(bot, message.Chat.ID)
 			case "profile":
 				showUserProfile(bot, message.Chat.ID)
+			case "help":
+				showHow(bot, message.Chat.ID)
 			default:
 				log.Printf("Unknown command: %s", message.Text)
 			}
@@ -90,12 +84,22 @@ func handleRegularMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message, cStat
 }
 
 func handleStartCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
-	msg := tgbotapi.NewMessage(message.Chat.ID, "![Memecoin Task](https://gummyonsol.com/images/529376304672a8a43191f520936dbd48.png)\n *I am memecoin task - 🤖* \n\n Welcome to my bot! Here you can: \n - Search for memecoins \n - Complete tasks and earn points \n\n 💰 Let's earn points")
+	photo := tgbotapi.NewPhoto(message.Chat.ID, tgbotapi.FileURL("https://gummyonsol.com/images/529376304672a8a43191f520936dbd48.png"))
+	_, err := bot.Send(photo)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	msg := tgbotapi.NewMessage(message.Chat.ID, "*Welcome to Fefe bot! 🤖* \n\n This bot lets you earn rewards by completing simple tasks. \n\n - ✨ Please choose from the button below")
 	msg.ParseMode = "Markdown"
-	memeCoinBtn := tgbotapi.NewInlineKeyboardButtonData("Memecoin", "memecoin")
+	howItWorksBtn := tgbotapi.NewInlineKeyboardButtonData("❓How it works", "help")
+	earnBtn := tgbotapi.NewInlineKeyboardButtonData("💰 Earn", "earn")
+	adsBtn := tgbotapi.NewInlineKeyboardButtonData("💻 Advertise", "ads")
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(memeCoinBtn),
+		tgbotapi.NewInlineKeyboardRow(howItWorksBtn),
+		tgbotapi.NewInlineKeyboardRow(earnBtn),
+		tgbotapi.NewInlineKeyboardRow(adsBtn),
 	)
 	msg.ReplyMarkup = keyboard
 	bot.Send(msg)
@@ -108,22 +112,32 @@ func handleStartCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
 //	keyboard := tgbotapi.NewReplyKeyboard(
 //		tgbotapi.NewKeyboardButtonRow(memecoinButton, helpButton),
 //	)
-//
+//a
 //	return keyboard
 //}
 
 func HandleCallbackQuery(bot *tgbotapi.BotAPI, callback *tgbotapi.CallbackQuery, cState *ChatState) {
+	//handleIDResponse(bot, message, cState)
+
 	switch callback.Data {
+	case "help":
+		showHow(bot, callback.Message.Chat.ID)
+	case "earn":
+		ShowTasks(bot, callback.Message.Chat.ID, &userOffsets, &mID)
+	case "prev":
+		ShowPrevTask(bot, callback.Message.Chat.ID, &userOffsets, &mID)
+	case "next":
+		ShowNextTask(bot, callback.Message.Chat.ID, &userOffsets, &mID)
 	case "gummy":
 		showGummyTasks(bot, callback.Message.Chat.ID)
-	case "memecoin":
-		showMemecoinOptions(bot, callback.Message.Chat.ID)
 	case "baked":
 		showBakedTasks(bot, callback.Message.Chat.ID)
 	case "submit_proof_gummy":
 		showInitialPrompt(bot, callback.Message, cState, "gummy")
 	case "submit_proof_baked":
 		showInitialPrompt(bot, callback.Message, cState, "baked")
+	case "profile":
+		showUserProfile(bot, callback.Message.Chat.ID)
 	default:
 		log.Printf("Unknown callback: %s", callback.Data)
 	}
@@ -148,16 +162,42 @@ func handleIDResponse(bot *tgbotapi.BotAPI, message *tgbotapi.Message, chatState
 	bot.Send(msg)
 }
 
-func showMemecoinOptions(bot *tgbotapi.BotAPI, chatID int64) {
-	//photo := tgbotapi.NewPhoto(chatID, tgbotapi.FileURL("https://mybwvaraeybzsepptucn.supabase.co/storage/v1/object/public/task_memecoin/DALL_E_May_31_Gummy_Bear_Memecoins.webp"))
-	//_, err := bot.Send(photo)
-	//if err != nil {
-	//	log.Panic(err)
-	//}
+//func showMemecoinOptions(bot *tgbotapi.BotAPI, chatID int64) {
+//	//photo := tgbotapi.NewPhoto(chatID, tgbotapi.FileURL("https://mybwvaraeybzsepptucn.supabase.co/storage/v1/object/public/task_memecoin/DALL_E_May_31_Gummy_Bear_Memecoins.webp"))
+//	//_, err := bot.Send(photo)
+//	//if err != nil {
+//	//	log.Panic(err)
+//	//}
+//
+//	msg := tgbotapi.NewMessage(chatID, "![choose memecoin](https://mybwvaraeybzsepptucn.supabase.co/storage/v1/object/public/task_memecoin/DALL_E_May_31_Gummy_Bear_Memecoins.webp) Choose a *Memecoin*: ")
+//	msg.ParseMode = "Markdown"
+//	msg.ReplyMarkup = memecoinKeyboard()
+//	bot.Send(msg)
+//}
 
-	msg := tgbotapi.NewMessage(chatID, "![choose memecoin](https://mybwvaraeybzsepptucn.supabase.co/storage/v1/object/public/task_memecoin/DALL_E_May_31_Gummy_Bear_Memecoins.webp) Choose a *Memecoin*: ")
+func showEarnMessage(bot *tgbotapi.BotAPI, chatID int64) {
+
+}
+
+func showHow(bot *tgbotapi.BotAPI, chatID int64) {
+	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FileURL("https://gummyonsol.com/images/529376304672a8a43191f520936dbd48.png"))
+	_, err := bot.Send(photo)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	msg := tgbotapi.NewMessage(chatID, "*❓ How it works❓* \n\nFefe bot is a cryptocurrency-based community task platform. \n\nby using this bot, you agree to Terms of Services and Privacy Policy. \n\nHere are all my commands: \n\n/start - show the main menu \n/earn - start completing task and earn points\n/balance - show your balance\n/help - Show help. \n\n *Start using fefe bot and earn points 🏆*")
 	msg.ParseMode = "Markdown"
-	msg.ReplyMarkup = memecoinKeyboard()
+	//howItWorksBtn := tgbotapi.NewInlineKeyboardButtonData("❓How it works", "help")
+	//earnBtn := tgbotapi.NewInlineKeyboardButtonData("💰 Earn", "earn")
+	//adsBtn := tgbotapi.NewInlineKeyboardButtonData("💻 Advertise", "ads")
+	//
+	//keyboard := tgbotapi.NewInlineKeyboardMarkup(
+	//	tgbotapi.NewInlineKeyboardRow(howItWorksBtn),
+	//	tgbotapi.NewInlineKeyboardRow(earnBtn),
+	//	tgbotapi.NewInlineKeyboardRow(adsBtn),
+	//)
+	//msg.ReplyMarkup = keyboard
 	bot.Send(msg)
 }
 
@@ -203,8 +243,8 @@ func showGummyTasks(bot *tgbotapi.BotAPI, chatID int64) {
 }
 
 func gummyTaskKeyboard() tgbotapi.InlineKeyboardMarkup {
-	twitterButton := tgbotapi.NewInlineKeyboardButtonURL("1. Follow $Gummy on Twitter", "https://twitter.com/gummy")
-	youtubeButton := tgbotapi.NewInlineKeyboardButtonURL("2. Comment On Youtube", "https://youtube.com/gummy")
+	twitterButton := tgbotapi.NewInlineKeyboardButtonURL("1. Follow $Gummy on Twitter", "https://x.com/gummyonsolana")
+	youtubeButton := tgbotapi.NewInlineKeyboardButtonURL("2. Comment On Youtube", "https://www.youtube.com/watch?v=XKB7EWvocEo")
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(twitterButton, youtubeButton),
@@ -221,8 +261,8 @@ func showBakedTasks(bot *tgbotapi.BotAPI, chatID int64) {
 }
 
 func bakedTaskKeyboard() tgbotapi.InlineKeyboardMarkup {
-	twitterButton := tgbotapi.NewInlineKeyboardButtonURL("3. Follow $Baked Twitter", "https://twitter.com/baked")
-	youtubeButton := tgbotapi.NewInlineKeyboardButtonURL("4. Comment On Youtube", "https://youtube.com/baked")
+	twitterButton := tgbotapi.NewInlineKeyboardButtonURL("3. Follow $Baked Twitter", "https://x.com/bakedtoken")
+	youtubeButton := tgbotapi.NewInlineKeyboardButtonURL("4. Comment On Youtube", "https://www.youtube.com/watch?v=XKB7EWvocEo")
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(twitterButton, youtubeButton),
@@ -253,7 +293,7 @@ func handlePhotoUpload(bot *tgbotapi.BotAPI, message *tgbotapi.Message, cState *
 	if message.Photo == nil {
 		msg := tgbotapi.NewMessage(message.Chat.ID, "please submit a file")
 		bot.Send(msg)
-		showMemecoinOptions(bot, message.Chat.ID)
+		//showMemecoinOptions(bot, message.Chat.ID)
 	} else {
 		fileID := message.Photo[len(message.Photo)-1].FileID
 
@@ -276,9 +316,10 @@ func handlePhotoUpload(bot *tgbotapi.BotAPI, message *tgbotapi.Message, cState *
 			log.Fatal(err)
 		}
 
-		profileButton := tgbotapi.NewKeyboardButton("Profile")
-		keyboard := tgbotapi.NewReplyKeyboard(
-			tgbotapi.NewKeyboardButtonRow(profileButton),
+		profileButton := tgbotapi.NewInlineKeyboardButtonData("profile", "profile")
+
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(profileButton),
 		)
 
 		msg = tgbotapi.NewMessage(message.Chat.ID, "You can view your profile using the button below:")

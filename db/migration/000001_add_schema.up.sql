@@ -3,24 +3,26 @@ CREATE TABLE users (
     telegram_id BIGINT UNIQUE NOT NULL
 );
 
-CREATE TABLE memecoins (
+CREATE TABLE tasks (
     id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL
+    name TEXT,
+    links TEXT,
+    descriptions TEXT
 );
 
-CREATE TABLE tasks (
+CREATE TABLE sub_tasks (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     links TEXT,
-    descriptions TEXT,
+    description TEXT,
     points INT NOT NULL,
-    memecoin_id INT references memecoins(id)
+    task_id INT REFERENCES tasks(id)
 );
 
-CREATE TABLE user_tasks (
+CREATE TABLE user_sub_tasks (
     user_id INT REFERENCES users(id),
-    task_id INT REFERENCES tasks(id),
+    sub_task_id INT REFERENCES sub_tasks(id),
     completed BOOLEAN DEFAULT FALSE,
     proof_file_url TEXT NOT NULL,
-    PRIMARY KEY (user_id, task_id)
+    PRIMARY KEY (user_id, sub_task_id)
 );
