@@ -23,7 +23,6 @@ func ListUser(c *gin.Context) {
 	defer rows.Close()
 
 	var users []User
-	// Iterate through the result set
 	for rows.Next() {
 		var user User
 		if err = rows.Scan(&user.ID, &user.TelegramID, &user.Completed, &user.ProofFileUrl); err != nil {

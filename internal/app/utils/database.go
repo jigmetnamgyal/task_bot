@@ -60,9 +60,9 @@ func GetUserPoints(telegramID int64) (map[string]int, error) {
 	}
 
 	rows, err := DB.Query(`
-        SELECT t.name, t.points
-        FROM tasks t
-        LEFT JOIN user_tasks ut ON t.id = ut.task_id
+        SELECT st.name, st.points
+        FROM sub_tasks st
+        LEFT JOIN user_sub_tasks ut ON st.id = ut.sub_task_id
         WHERE ut.user_id = $1 AND ut.completed = TRUE
     `, userID)
 	if err != nil {

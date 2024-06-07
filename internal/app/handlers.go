@@ -2,6 +2,7 @@ package app
 
 import (
 	"cmd/task_bot/internal/app/utils"
+	"context"
 	"fmt"
 	"github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
@@ -15,6 +16,9 @@ var userOffsets = make(map[int64]int64)
 var mID = make(map[int64]int)
 var tID = make(map[int64]int)
 var stOffsets = make(map[int64]int64)
+var stID = make(map[int64]int)
+
+var cancelFuncs = make(map[int64]context.CancelFunc)
 
 type ChatState struct {
 	sync.RWMutex
@@ -105,19 +109,9 @@ func handleStartCommand(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
 	bot.Send(msg)
 }
 
-//func mainMenuKeyboard() tgbotapi.ReplyKeyboardMarkup {
-//	memecoinButton := tgbotapi.NewKeyboardButton("Memecoin")
-//	helpButton := tgbotapi.NewKeyboardButton("Help")
-//
-//	keyboard := tgbotapi.NewReplyKeyboard(
-//		tgbotapi.NewKeyboardButtonRow(memecoinButton, helpButton),
-//	)
-//a
-//	return keyboard
-//}
-
 func HandleCallbackQuery(bot *tgbotapi.BotAPI, callback *tgbotapi.CallbackQuery, cState *ChatState) {
 	tid := tID[callback.Message.Chat.ID]
+	stid := stID[callback.Message.Chat.ID]
 
 	switch callback.Data {
 	case "help":
@@ -125,15 +119,17 @@ func HandleCallbackQuery(bot *tgbotapi.BotAPI, callback *tgbotapi.CallbackQuery,
 	case "earn":
 		ShowTasks(bot, callback.Message.Chat.ID, &userOffsets, &mID, &tID)
 	case "prev":
-		ShowPrevTask(bot, callback.Message.Chat.ID, &userOffsets, &mID)
+		ShowPrevTask(bot, callback.Message.Chat.ID, &userOffsets, &mID, &tID)
 	case "next":
-		ShowNextTask(bot, callback.Message.Chat.ID, &userOffsets, &mID)
+		ShowNextTask(bot, callback.Message.Chat.ID, &userOffsets, &mID, &tID)
 	case "sub_task_prev":
-		ShowSubTaskPrevTask(bot, callback.Message.Chat.ID, &stOffsets, &mID, &tID)
+		ShowSubTaskPrevTask(bot, callback.Message.Chat.ID, &stOffsets, &mID, &tID, &stID, cancelFuncs)
 	case "sub_task_next":
-		ShowSubTaskNextTask(bot, callback.Message.Chat.ID, &stOffsets, &mID, &tID)
+		ShowSubTaskNextTask(bot, callback.Message.Chat.ID, &stOffsets, &mID, &tID, &stID, cancelFuncs)
 	case "complete_task_" + strconv.Itoa(tid):
-		HandleTakeTask(bot, callback.Message.Chat.ID, tid, &stOffsets, &mID)
+		HandleTakeTask(bot, callback.Message.Chat.ID, tid, &stOffsets, &mID, &stID, cancelFuncs)
+	case "confirm_subtask_" + strconv.Itoa(stid):
+		handleTaskComplete(bot, callback.Message.Chat.ID, stid)
 	case "profile":
 		showUserProfile(bot, callback.Message.Chat.ID)
 	default:
@@ -157,19 +153,6 @@ func handleIDResponse(bot *tgbotapi.BotAPI, message *tgbotapi.Message, chatState
 	bot.Send(msg)
 }
 
-//func showMemecoinOptions(bot *tgbotapi.BotAPI, chatID int64) {
-//	//photo := tgbotapi.NewPhoto(chatID, tgbotapi.FileURL("https://mybwvaraeybzsepptucn.supabase.co/storage/v1/object/public/task_memecoin/DALL_E_May_31_Gummy_Bear_Memecoins.webp"))
-//	//_, err := bot.Send(photo)
-//	//if err != nil {
-//	//	log.Panic(err)
-//	//}
-//
-//	msg := tgbotapi.NewMessage(chatID, "![choose memecoin](https://mybwvaraeybzsepptucn.supabase.co/storage/v1/object/public/task_memecoin/DALL_E_May_31_Gummy_Bear_Memecoins.webp) Choose a *Memecoin*: ")
-//	msg.ParseMode = "Markdown"
-//	msg.ReplyMarkup = memecoinKeyboard()
-//	bot.Send(msg)
-//}
-
 func showHow(bot *tgbotapi.BotAPI, chatID int64) {
 	photo := tgbotapi.NewPhoto(chatID, tgbotapi.FileURL("https://gummyonsol.com/images/529376304672a8a43191f520936dbd48.png"))
 	_, err := bot.Send(photo)
@@ -179,16 +162,6 @@ func showHow(bot *tgbotapi.BotAPI, chatID int64) {
 
 	msg := tgbotapi.NewMessage(chatID, "*❓ How it works❓* \n\nFefe bot is a cryptocurrency-based community task platform. \n\nby using this bot, you agree to Terms of Services and Privacy Policy. \n\nHere are all my commands: \n\n/start - show the main menu \n/earn - start completing task and earn points\n/balance - show your balance\n/help - Show help. \n\n *Start using fefe bot and earn points 🏆*")
 	msg.ParseMode = "Markdown"
-	//howItWorksBtn := tgbotapi.NewInlineKeyboardButtonData("❓How it works", "help")
-	//earnBtn := tgbotapi.NewInlineKeyboardButtonData("💰 Earn", "earn")
-	//adsBtn := tgbotapi.NewInlineKeyboardButtonData("💻 Advertise", "ads")
-	//
-	//keyboard := tgbotapi.NewInlineKeyboardMarkup(
-	//	tgbotapi.NewInlineKeyboardRow(howItWorksBtn),
-	//	tgbotapi.NewInlineKeyboardRow(earnBtn),
-	//	tgbotapi.NewInlineKeyboardRow(adsBtn),
-	//)
-	//msg.ReplyMarkup = keyboard
 	bot.Send(msg)
 }
 
@@ -213,54 +186,6 @@ func showUserProfile(bot *tgbotapi.BotAPI, chatID int64) {
 	msg := tgbotapi.NewMessage(chatID, "![Points](https://pbs.twimg.com/media/GN28dBfX0AA2dt-?format=jpg&name=large) \n*Total points earned: "+strconv.Itoa(total)+"*\n\n"+response)
 	msg.ParseMode = "Markdown"
 	bot.Send(msg)
-}
-
-func memecoinKeyboard() tgbotapi.InlineKeyboardMarkup {
-	gummyButton := tgbotapi.NewInlineKeyboardButtonData("$Gummy", "gummy")
-	bakedButton := tgbotapi.NewInlineKeyboardButtonData("$Baked", "baked")
-
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(gummyButton, bakedButton),
-	)
-
-	return keyboard
-}
-
-func showGummyTasks(bot *tgbotapi.BotAPI, chatID int64) {
-	msg := tgbotapi.NewMessage(chatID, "Choose gummy tasks to [earn points](https://gummyonsol.com/images/f0d9f977ea430a9b57a7d4f7277df4eb.png):")
-	msg.ParseMode = "Markdown"
-	msg.ReplyMarkup = gummyTaskKeyboard()
-	bot.Send(msg)
-}
-
-func gummyTaskKeyboard() tgbotapi.InlineKeyboardMarkup {
-	twitterButton := tgbotapi.NewInlineKeyboardButtonURL("1. Follow $Gummy on Twitter", "https://x.com/gummyonsolana")
-	youtubeButton := tgbotapi.NewInlineKeyboardButtonURL("2. Comment On Youtube", "https://www.youtube.com/watch?v=XKB7EWvocEo")
-
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(twitterButton, youtubeButton),
-		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Submit Proof of Completion", "submit_proof_gummy")),
-	)
-
-	return keyboard
-}
-
-func showBakedTasks(bot *tgbotapi.BotAPI, chatID int64) {
-	msg := tgbotapi.NewMessage(chatID, "Choose Baked tasks to ![earn points](https://memestaking.com/_nuxt/baked-d.VVFJ9SFz.png):")
-	msg.ReplyMarkup = bakedTaskKeyboard()
-	bot.Send(msg)
-}
-
-func bakedTaskKeyboard() tgbotapi.InlineKeyboardMarkup {
-	twitterButton := tgbotapi.NewInlineKeyboardButtonURL("3. Follow $Baked Twitter", "https://x.com/bakedtoken")
-	youtubeButton := tgbotapi.NewInlineKeyboardButtonURL("4. Comment On Youtube", "https://www.youtube.com/watch?v=XKB7EWvocEo")
-
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(twitterButton, youtubeButton),
-		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Submit Proof of Completion", "submit_proof_baked")),
-	)
-
-	return keyboard
 }
 
 func userExists(telegramID int64) (bool, error) {

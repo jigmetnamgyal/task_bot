@@ -23,6 +23,5 @@ CREATE TABLE user_sub_tasks (
     user_id INT REFERENCES users(id),
     sub_task_id INT REFERENCES sub_tasks(id),
     completed BOOLEAN DEFAULT FALSE,
-    proof_file_url TEXT NOT NULL,
     PRIMARY KEY (user_id, sub_task_id)
 );
